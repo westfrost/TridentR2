@@ -2,94 +2,61 @@
 
 Dato: 2026-07-19
 Repo: TridentR2 (Klipper + Happy Hare MMU)
+Bemærk: Den døde mappe `mmu123123/` er bevidst holdt UDE af denne analyse.
 
 ## Kort svar
 
-Der er **to årsager**, der begge kan forklare det:
+**Happy Hare selv former ikke en tip — den klipper.** Den aktive config er sat op
+til toolhead-klip (`_MMU_CUT_TIP`) med tip forming slået fra
+(`simple_tip_forming: False`). Ser du stadig tip forming, kommer det derfor med
+stor sandsynlighed fra **sliceren**, hvis ramming/tip-shaping stadig er tændt.
 
-1. **Du redigerer sandsynligvis den forkerte mappe.** Printeren læser KUN fra
-   `printer_data/config/mmu/`. Mappen `printer_data/config/mmu123123/` (og filen
-   `mmu_vars.cfgasdasd`) er **døde kopier, der ikke inkluderes af noget**.
-   Ændringer lavet der har ingen effekt — det er den klassiske grund til at noget
-   "stadig" sker.
+## Dokumentation af fund (kun aktiv config: `mmu/base/`)
 
-2. **Slicerens tip forming / ramming er sandsynligvis stadig tændt.** Den aktive
-   config tvinger standalone-håndtering (`force_form_tip_standalone: 1`), som
-   udtrykkeligt kræver at sliceren slås fra ("TURN SLICER OFF!"). Er slicerens
-   ramming/tip-shaping stadig aktiv i filament-/printerprofilen, laver den tip
-   forming under print — uafhængigt af Happy Hare.
-
-## Dokumentation af fund
-
-### Hvad er faktisk aktivt?
-
-`printer_data/config/printer.cfg` inkluderer:
+### Tip forming-parametre (`mmu/base/mmu_parameters.cfg`)
 
 ```
-[include mmu/base/*.cfg]
-[include mmu/optional/client_macros.cfg]
-...
-[include MMU.cfg]        # <-- denne fil er TOM
+force_form_tip_standalone: 1     # linje 313 — Happy Hare håndterer det altid standalone (sluk sliceren!)
+form_tip_macro: _MMU_CUT_TIP     # linje 314 — kalder KLIPPE-makroen, ikke forme-makroen
 ```
 
-Søgning efter `mmu123123` i alle konfigurationsfiler: **ingen referencer**.
-→ `mmu123123/` er en død mappe. `MMU.cfg` i roden er tom.
-
-### Aktiv tip forming-opsætning (`mmu/base/mmu_parameters.cfg`)
+### Klippe-makroens variabler (`mmu/base/mmu_macro_vars.cfg`, `_MMU_CUT_TIP_VARS`)
 
 ```
-force_form_tip_standalone: 1        # linje 313 — altid standalone (sluk sliceren!)
-form_tip_macro: _MMU_CUT_TIP        # linje 314 — kalder CUT-makroen (toolhead-cutter)
-extruder_form_tip_current: 100
-slicer_tip_park_pos: 0
+variable_simple_tip_forming : False   # linje 291 — INGEN tip forming udføres i klippet
+variable_blade_pos          : 54      # toolhead-cutter (klinge 54 mm fra nozzle-spids)
+variable_pin_loc_xy         : -5, 5   # depressor-pin position (Filametrix-agtig toolhead-cutter)
 ```
 
-### Aktiv makro-variabel (`mmu/base/mmu_macro_vars.cfg`)
+### Konklusion om den aktive opsætning
 
-```
-variable_simple_tip_forming : False   # linje 291 — springer tip forming over i cut-makroen
-```
+- `form_tip_macro` = `_MMU_CUT_TIP` → **klip**, ikke form.
+- `simple_tip_forming` = `False` → klippet indeholder **ikke** et tip forming-trin.
+- `force_form_tip_standalone` = `1` → Happy Hare gør det altid selv, og sliceren
+  SKAL være slået fra ("TURN SLICER OFF!").
 
-**Vigtig konklusion:** I den *aktive* config former Happy Hare ikke selv en tip.
-`form_tip_macro` peger på `_MMU_CUT_TIP` (klip), og `simple_tip_forming` er
-`False`. Happy Hare *klipper* altså — den *former* ikke. Ser du stadig tip
-forming-*bevægelse*, kommer den derfor med stor sandsynlighed fra sliceren.
+Den eneste måde, den *aktive* Happy Hare-config ville forme en tip på, er hvis
+`simple_tip_forming` var `True` — og det er den ikke. Altså er det ikke Happy Hare.
 
-### Forskel mellem aktiv mappe og den døde kopi
+## Mest sandsynlige årsag: sliceren
 
-| Indstilling                   | `mmu/` (AKTIV)   | `mmu123123/` (DØD) |
-|-------------------------------|------------------|--------------------|
-| `form_tip_macro`              | `_MMU_CUT_TIP`   | `_MMU_FORM_TIP`    |
-| `variable_simple_tip_forming` | `False`          | `True`             |
+`force_form_tip_standalone: 1` betyder, at slicerens tip forming skal være slået
+fra. Er den ikke det, laver sliceren ramming/tip-shaping under print, oveni Happy
+Hares klip. Tjek i slicerens filamentprofil:
 
-Bemærk: den døde mappe er sat op til at *forme* tip. Hvis du har lavet dine
-seneste ændringer der, har de aldrig ramt printeren.
+- **Filament ramming / "tip shaping"** → slå FRA.
+- Evt. wipe/purge-relaterede indstillinger, hvis de også kører uventet.
 
-## Foreslåede handlinger (endnu ikke udført)
+## Hvis du i stedet vil BEHOLDE tip forming
 
-Vælg alt efter hvad du faktisk vil opnå:
+Så peg `form_tip_macro` på `_MMU_FORM_TIP` (linje 314) — men det giver kun mening,
+hvis du ikke bruger toolhead-cutter. Bekræft venligst hvilken metode du kører.
 
-### A) Du vil helt af med tip forming (fordi du klipper ved toolhead)
-Den aktive config er allerede korrekt til dette. Kontrollér i stedet **sliceren**:
-- Sluk "Filament ramming" / "tip shaping" i filamentprofilen.
-- Sluk evt. wipe tower hvis du ikke bruger den.
+## Hvad jeg mangler fra dig
 
-### B) Du bruger EREC-cutter (klip ved MMU, ikke toolhead)
-Så skal det aktive `form_tip_macro` ifølge Happy Hares egen note ændres til
-`_MMU_FORM_TIP` (form en pæn tip før udtræk, klip så ved MMU efter unload), og
-EREC-addon skal aktiveres. Bekræft venligst hvilken cutter du har, før dette
-ændres.
+1. Hvor ser du tip forming ske — i konsollens log, eller som fysisk bevægelse på
+   printeren?
+2. Bruger du toolhead-cutter (nuværende opsætning) eller vil du helt væk fra klip?
 
-### C) Ryd op i de døde filer (anbefales uanset)
-Fjern det, der kun skaber forvirring:
-- `printer_data/config/mmu123123/` (hele mappen)
-- `printer_data/config/mmu123123/mmu_vars.cfgasdasd`
-- Evt. den tomme `printer_data/config/MMU.cfg`
-
-Dette er destruktive sletninger — bekræft venligst, før jeg udfører dem.
-
-## Hvad jeg mangler fra dig for at gå videre
-
-1. Hvilken cutter/tip-metode vil du reelt bruge? (toolhead-klip / EREC / ingen)
-2. Hvor ser du tip forming ske — i konsollens log, eller som fysisk bevægelse?
-3. Må jeg slette de døde filer (afsnit C)?
+Sig til, så laver jeg selve config-ændringen (den lægges her i `ændringer/` som
+aftalt, medmindre du beder mig redigere kildefilerne direkte).

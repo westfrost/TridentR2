@@ -170,28 +170,50 @@ travel-højden. `Z_TILT_ADJUST` og heat soak-målingerne bliver også lidt hurti
 
 ### Grænserne for de to tal
 
-**1,0 mm retract:** den bindende grænse er ikke clearance til pladen, men at Tap'ens
-flexure skal nå at **de-trigge** før næste nedtur. Optisk Tap udløser typisk 0,2–0,5 mm
-inde i vandringen, og decelerationen ved 5 mm/s med `max_z_accel: 350` lægger kun
-0,036 mm oveni — så 1,0 mm er cirka 2× margin. Marginen afhænger dog af, hvor din
-optiske flag sidder, og fejlmoden er hård: `Probe triggered prior to movement` afbryder
-mesh'et og dermed printet.
-
-Verificér før du printer noget vigtigt:
+**1,0 mm retract — målt og bekræftet.** Den bindende grænse er ikke clearance til
+pladen, men at Tap'ens flexure skal nå at **de-trigge** før næste nedtur.
+`PROBE_ACCURACY SAMPLES=100 SAMPLE_RETRACT_DIST=1` gav:
 
 ```
-PROBE_ACCURACY SAMPLES=10 SAMPLE_RETRACT_DIST=1
+maximum -0.301250, minimum -0.302500, range 0.001250, average -0.301263,
+median -0.301250, standard deviation 0.000124, average delta 0.000025
 ```
 
-Kører den 10 samples igennem uden fejl, og er spredningen på niveau med den samme test
-ved `SAMPLE_RETRACT_DIST=3`, er 1,0 mm bevist på netop din maskine. Ser du fejlen, så
-sæt `sample_retract_dist: 1.5` — det koster kun omkring 35 sekunder på en fuld plade.
+Ingen `Probe triggered prior to movement` på 100 samples. Og spredningen er ikke bare
+lille — den er **under målegrænsen**: `stepper_z` har `rotation_distance: 4` og
+`microsteps: 16` med 200 fuldskridt, altså 4 / (200 × 16) = 0,00125 mm pr. microstep.
+Den målte range er præcis 0,001250, og både max og min er eksakte multipla
+(−241 og −242 skridt). `average delta 0.000025` viser, at nøjagtig 1 ud af 100 samples
+landede én microstep lavt; de øvrige 99 ramte samme skridt.
+
+Testen er desuden hårdere end den rigtige belastning: `PROBE_ACCURACY` prober samme
+punkt med kun retract-distancen imellem, mens et mesh løfter yderligere til
+`horizontal_move_z` og kører XY imellem hvert punkt, så flexuren får mere tid til at
+nulstille.
 
 **2 mm travel-højde:** mesh'et kører først efter `Z_TILT_ADJUST` og `G28 Z`, så
 gantryet er rettet ind og nulpunktet friskt. En Voron 350-plade varierer typisk
 0,2–0,5 mm over 10–320, så der er halvanden millimeter reel luft tilbage.
 Blobifier-bakken (X=10, Y=350) og børsten (X=50–80, Y=350) ligger begge uden for
 mesh-området, der stopper ved Y=320.
+
+### Åben mulighed: `samples: 3` → `2`
+
+Måleresultatet rejser et spørgsmål om noget helt andet. Med `drop_first_result: True`
+koster hvert punkt 4 nedture, og `samples: 3` med median findes for at kunne kassere
+en outlier. Men når 99 af 100 samples rammer nøjagtig samme microstep, køber medianen
+af 3 stort set ingenting oven i medianen af 2.
+
+`samples: 2` fjerner én nedtur pr. punkt — cirka 0,27 s, altså **~32 s på en fuld
+plade** — og beholder outlier-beskyttelsen, fordi `samples_tolerance: 0.006` stadig
+sammenligner de to og udløser en retry ved uenighed. Tolerancen ligger næsten 5×
+over microstep-opløsningen, så den fejludløser ikke.
+
+`samples: 1` ville spare det dobbelte, men så er der intet at sammenligne med, og
+`samples_tolerance` holder op med at gøre noget. Et enkelt dårligt punkt ville
+forurene en mesh-celle uopdaget. Det fraråder jeg.
+
+Ikke ændret — det er din beslutning.
 
 To ting jeg **ikke** har rørt:
 

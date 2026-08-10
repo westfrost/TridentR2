@@ -116,12 +116,12 @@
  samples_result: median
 -sample_retract_dist: 3.0
 +sample_retract_dist: 1.0        # Saenket fra 3.0. Distancen koster dobbelt: baade
-+                                # loft ved 15 mm/s OG nedtur igen ved 5 mm/s. Graensen
-+                                # er ikke clearance, men at Tap skal naa at de-trigge -
-+                                # flexuren udloser 0.2-0.5 mm inde, saa 1.0 mm er ca. 2x
-+                                # margin. Verificer med:
-+                                #   PROBE_ACCURACY SAMPLES=10 SAMPLE_RETRACT_DIST=1
-+                                # Ved "Probe triggered prior to movement" saet den til 1.5.
++                                # loft ved 15 mm/s OG nedtur igen ved 5 mm/s.
++                                # Verificeret med PROBE_ACCURACY SAMPLES=100:
++                                #   range 0.001250  stddev 0.000124  avg delta 0.000025
++                                # Range = praecis 1 microstep (4mm / 200 / 16 =
++                                # 0.00125mm), dvs. under maalegraensen. 99 af 100
++                                # samples ramte samme skridt, ingen de-trigger-fejl.
  samples_tolerance: 0.006        # Tap er meget repeterbar - stram tolerance anbefales
  samples_tolerance_retries: 3
  drop_first_result: True         # Kalico-funktion: kasserer første måling, som ofte er en outlier

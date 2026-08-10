@@ -110,11 +110,33 @@
 +  G90                                                   # Absolute position
 --- a/printer_data/config/configs/probe.cfg
 +++ b/printer_data/config/configs/probe.cfg
-@@ -73,8 +73,14 @@
+@@ -10,7 +10,13 @@
+ lift_speed: 15.0
+ samples: 3
+ samples_result: median
+-sample_retract_dist: 3.0
++sample_retract_dist: 1.0        # Saenket fra 3.0. Distancen koster dobbelt: baade
++                                # loft ved 15 mm/s OG nedtur igen ved 5 mm/s. Graensen
++                                # er ikke clearance, men at Tap skal naa at de-trigge -
++                                # flexuren udloser 0.2-0.5 mm inde, saa 1.0 mm er ca. 2x
++                                # margin. Verificer med:
++                                #   PROBE_ACCURACY SAMPLES=10 SAMPLE_RETRACT_DIST=1
++                                # Ved "Probe triggered prior to movement" saet den til 1.5.
+ samples_tolerance: 0.006        # Tap er meget repeterbar - stram tolerance anbefales
+ samples_tolerance_retries: 3
+ drop_first_result: True         # Kalico-funktion: kasserer første måling, som ofte er en outlier
+@@ -72,9 +78,21 @@
+ [bed_mesh]
  algorithm: bicubic
  speed: 400
- horizontal_move_z: 5
+-horizontal_move_z: 5
 -probe_count:5,5
++horizontal_move_z: 2           # Saenket fra 5. Mesh koeres foerst efter Z_TILT_ADJUST
++                               # og G28 Z, saa gantryet er rettet ind og nulpunktet
++                               # friskt. Pladen varierer typisk 0.2-0.5 mm over
++                               # 10-320, saa der er ca. 1.5 mm reel luft tilbage.
++                               # Blobifier-bakken (X10/Y350) og boersten (Y350) ligger
++                               # uden for mesh-omraadet og rammes ikke.
 +probe_count: 11,11             # 121 punkter over 10-320 = 31 mm punktafstand
  mesh_min: 10,10
  mesh_max: 320,320
@@ -125,7 +147,8 @@
 +# BED_MESH_CALIBRATE koeres med ADAPTIVE=1 fra PRINT_START. Klipper
 +# skalerer punktantallet ned efter printets areal og bevarer
 +# punkttaetheden, saa smaa prints ikke koster 121 punkter.
-+# En fuld plade tager ca. 7-8 min med 3 samples pr. punkt ved 5 mm/s.
++# En fuld plade tager ca. 4 min med sample_retract_dist 1.0 og
++# horizontal_move_z 2 (mod 8-9 min med de gamle 3.0/5).
 +# Vil du have mere luft omkring objektet, saa tilfoej ADAPTIVE_MARGIN=5
 +# til BED_MESH_CALIBRATE i print_start.cfg.
 \ No newline at end of file

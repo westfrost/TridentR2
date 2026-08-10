@@ -10,7 +10,7 @@ så du kan kopiere direkte oveni.
 |---|---|---|
 | `macros/heat_soak.cfg` | **ny** | Selve drift-målingen: variable, målecyklus, probe og vurdering |
 | `macros/print_start.cfg` | ændret | Bruger den nye soak i stedet for de faste 10 minutter |
-| `configs/probe.cfg` | ændret | `probe_count: 5,5` → `11,11` |
+| `configs/probe.cfg` | ændret | `probe_count: 5,5` → `11,11`, plus kortere probe-bevægelser |
 | `configs/Bedfans.cfg` | ændret | Ny `BEDFAN_SOAK_MODE` — låser blæserhastigheden under soaken |
 
 `aendringer.patch` indeholder de samme ændringer som unified diff, hvis du hellere
@@ -136,18 +136,75 @@ for `BED_MESH_CALIBRATE` og `Z_TILT_ADJUST`.
 ## 2. Bed mesh: 11×11, stadig adaptivt
 
 `probe_count: 5,5` → `11,11`. 121 punkter over 10–320 mm giver 31 mm punktafstand.
-`ADAPTIVE=1` er uændret i `PRINT_START`.
-
-Klipper skalerer punktantallet ned efter printets areal og bevarer punkttætheden, så
-små prints ikke koster 121 punkter. **En fuld plade tager omkring 7–8 minutter** med
-3 samples pr. punkt ved 5 mm/s — mærkbart langsommere end de 25 punkter i dag. Vil du
-have det ned, er de to knapper `samples: 2` i `probe.cfg` eller `speed: 8` på proben.
+`ADAPTIVE=1` er uændret i `PRINT_START`. Klipper skalerer punktantallet ned efter
+printets areal og bevarer punkttætheden, så små prints ikke koster 121 punkter.
 
 `bicubic` fungerer fint med 11 punkter.
 
+## 3. Kortere probe-bevægelser
+
+Nedturen mod bed'et er **uændret** på 5,0 mm/s. Det er kun de tomme bevægelser der er
+skåret ned:
+
+| Parameter | Før | Nu |
+|---|---|---|
+| `sample_retract_dist` | 3,0 mm | **1,0 mm** |
+| `[bed_mesh] horizontal_move_z` | 5 mm | **2 mm** |
+
+`sample_retract_dist` koster dobbelt: den bestemmer både hvor langt der løftes ved
+15 mm/s **og** hvor langt der køres ned igen ved 5 mm/s. Nedturen er den dyre. Med
+`samples: 3` og `drop_first_result: True` er der 4 nedture pr. punkt, altså 3 gentagne
+løft-og-ned-cyklusser der hver sparer godt en halv sekund.
+
+| Pr. mesh-punkt | Før | Nu |
+|---|---|---|
+| Nedtur til første sample | 1,00 s | 0,40 s |
+| 3 × (løft + nedtur) | 2,40 s | 0,80 s |
+| Afsluttende løft | 0,40 s | 0,13 s |
+| XY-flyt (31 mm) | 0,18 s | 0,18 s |
+| **I alt** | **~4,0 s** | **~1,5 s** |
+
+Med overhead pr. probe lander en fuld 11×11-plade på **omkring 4 minutter i stedet for
+8–9**. To tredjedele af besparelsen kommer fra retract-distancen, en tredjedel fra
+travel-højden. `Z_TILT_ADJUST` og heat soak-målingerne bliver også lidt hurtigere.
+
+### Grænserne for de to tal
+
+**1,0 mm retract:** den bindende grænse er ikke clearance til pladen, men at Tap'ens
+flexure skal nå at **de-trigge** før næste nedtur. Optisk Tap udløser typisk 0,2–0,5 mm
+inde i vandringen, og decelerationen ved 5 mm/s med `max_z_accel: 350` lægger kun
+0,036 mm oveni — så 1,0 mm er cirka 2× margin. Marginen afhænger dog af, hvor din
+optiske flag sidder, og fejlmoden er hård: `Probe triggered prior to movement` afbryder
+mesh'et og dermed printet.
+
+Verificér før du printer noget vigtigt:
+
+```
+PROBE_ACCURACY SAMPLES=10 SAMPLE_RETRACT_DIST=1
+```
+
+Kører den 10 samples igennem uden fejl, og er spredningen på niveau med den samme test
+ved `SAMPLE_RETRACT_DIST=3`, er 1,0 mm bevist på netop din maskine. Ser du fejlen, så
+sæt `sample_retract_dist: 1.5` — det koster kun omkring 35 sekunder på en fuld plade.
+
+**2 mm travel-højde:** mesh'et kører først efter `Z_TILT_ADJUST` og `G28 Z`, så
+gantryet er rettet ind og nulpunktet friskt. En Voron 350-plade varierer typisk
+0,2–0,5 mm over 10–320, så der er halvanden millimeter reel luft tilbage.
+Blobifier-bakken (X=10, Y=350) og børsten (X=50–80, Y=350) ligger begge uden for
+mesh-området, der stopper ved Y=320.
+
+To ting jeg **ikke** har rørt:
+
+- `[z_tilt] horizontal_move_z: 5` er død config — `z-tilt.cfg` sætter selv
+  `HORIZONTAL_MOVE_Z=10` på pass 1 og `=2` på pass 2, så konfigurationsværdien bruges
+  aldrig.
+- `probe_z: 5` i `_HEATSOAK_VARS` står stadig på 5 mm. Der er én måling hvert 5. minut,
+  så de 0,6 sparede sekunder er ligegyldige, og den ekstra clearance er rar mens
+  pladen stadig bevæger sig.
+
 ---
 
-## 3. Bedfans under soaken
+## 4. Bedfans under soaken
 
 Ny makro `BEDFAN_SOAK_MODE` i `Bedfans.cfg`, som kaldes af `_HEATSOAK_BEGIN`.
 

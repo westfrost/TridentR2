@@ -1,8 +1,16 @@
 # Nevermore Mini – integration i PRINT_START/PRINT_END
 
 Noter fra gennemgang af repoet og https://github.com/SanaaHamel/nevermore-controller.
-De faktiske rettelser er lavet direkte i de rigtige config-filer (se nedenfor) – denne
-mappe er kun til noter/valgfrie ekstra filer, som instrueret.
+De faktiske rettelser er lavet direkte i de rigtige config-filer (se nedenfor). I mappen
+`ændrede filer/` ligger friske kopier af de tre filer, præcis som de ser ud efter
+ændringerne, til reference:
+
+- `ændrede filer/print_start.cfg` ← `printer_data/config/macros/print_start.cfg`
+- `ændrede filer/print_end.cfg` ← `printer_data/config/macros/print_end.cfg`
+- `ændrede filer/NevermoreMini.cfg` ← `printer_data/config/configs/NevermoreMini.cfg`
+
+Kopierne er kun til reference/gennemsyn – det er stadig filerne i `printer_data/`
+der rent faktisk bliver kørt af Klipper.
 
 ## Fejl der blev fundet og rettet
 
@@ -89,15 +97,13 @@ kalibrering unødigt.
   startes uden filtrering – ville kræve at man slår det korrekte printer-objekt-
   felt for forbindelsesstatus op i Nevermore-modulets kildekode først, så jeg
   har bevidst ikke gættet mig til det i de rigtige macro-filer.
-- **Filterlevetids-påmindelse**: Den gamle, døde `configs/Nevermore`-fil havde
-  faktisk en fin idé (tæller timer blæseren har kørt, og påminder om
-  filterskift). Den byggede bare på det forkerte/døde fan-objekt. Der ligger
-  en opdateret, brugsklar udgave her i mappen:
-  `filter_timer_optional.cfg` – peger på det rigtige `nevermore_fan`-objekt.
-  Den er **ikke** inkluderet i printer.cfg (jeres regel om kun at gemme nyt
-  her respekteres) – flyt filen til `printer_data/config/configs/` og tilføj
-  fx `RESET_AIR_FILTER`/`QUERY_AIR_FILTER` til jeres macroer, hvis I vil bruge
-  den.
+- ~~Filterlevetids-påmindelse (timer-baseret)~~ – **ikke relevant**: den gamle,
+  døde `configs/Nevermore`-fil havde en timer-baseret "husk at skifte filter"-
+  funktion, men den er overflødig nu. Nevermore Mini måler VOC direkte
+  (`temperature_sensor nevermore_exhaust_VOC` i `NevermoreMini.cfg`, som
+  allerede plottes i Mainsail/Fluidd), så I kan se på VOC-indekset, når kullet
+  reelt er mættet, i stedet for at gætte ud fra antal køretimer. Filen er
+  fjernet fra denne mappe igen.
 - **`fan_policy_cooldown`**: styrer hvor længe (standard 900 sek) Nevermoren
   bliver ved med at filtrere efter automatik-policyen ellers ville stoppe.
   Værd at kigge på hvis I vil have mere/mindre eftertræk efter et print (den
